@@ -1,32 +1,57 @@
 #include "ReqSvrRequest.h"
 #include "logger.h"
 
+#include "SimpleJSON.h"
 
-std::shared_ptr<ReqSvrRequest> ReqSvrRequest::NewRequest(
-    boost::asio::io_service& io_service,
-    const std::string& uri,
-    const std::string& reqName,
-    const std::string& data)
-{
-    std::shared_ptr<ReqSvrRequest> request(
-            new ReqSvrRequest(io_service, uri, reqName, data));
 
-    request->keepAlive = request;
+namespace {
+    // TODO: This is completely the wrong place. It should be shared with the
+    //       ReqSvr class
+    static const std::string ERROR_FLAG = "ERROR ";
+    NewIntField(errorNumber);
+    NewStringField(errorText);
+    typedef SimpleParsedJSON<errorNumber,errorText> ErrorMsg;
 
-    request->StartRequest();
+    struct ErrorFields {
+        std::string errorText;
+        int errorCode;
+    };
 
-    return request;
+    bool isError(const std::string& msg, ErrorFields& error) {
+        bool isError = false;
+        if ( msg.length() > ERROR_FLAG.length() &&
+             msg.substr(0, ERROR_FLAG.length()) == ERROR_FLAG)
+        {
+            static ErrorMsg parser;
+            parser.Clear();
+
+            static std::string parseFailMsg;
+
+            const char* const errorObjStr =
+                    msg.c_str() + ERROR_FLAG.length();
+
+            if (parser.Parse(errorObjStr, parseFailMsg)) {
+                error.errorCode = parser.Get<errorNumber>();
+                error.errorText = parser.Get<errorText>();
+                isError = true;
+            }
+        }
+        else {
+            isError = false;
+        }
+
+        return isError;
+    }
 }
 
 ReqSvrRequest::ReqSvrRequest(
-    boost::asio::io_service& service,
-    const std::string& uri,
     const std::string& reqName,
     const std::string& data)
-  : AsyncReqSvrRequest(service, uri, reqName, data)
-  , statusFuture(statusFlag.get_future())
-  , io_service(service)
+  : statusFuture(statusFlag.get_future())
 {
+    std::stringstream payloadStream;
+    payloadStream << reqName << " " << data;
+    payload = payloadStream.str();
 }
 
 ReqSvrRequest::~ReqSvrRequest() {
@@ -34,54 +59,84 @@ ReqSvrRequest::~ReqSvrRequest() {
 
 const ReplyMessage& ReqSvrRequest::WaitForMessage() {
     statusFuture.wait();
-    const auto& response = GetMessage();
-    switch(response.state_)
+    switch(message.state_)
     {
     case ReplyMessage::COMPLETE:
     case ReplyMessage::REJECTED:
         // all good - safe to return
         break;
     case ReplyMessage::INVALID_URI:
-        throw InvalidURIError{ response.error };
+        throw InvalidURIError{ message.error_ };
         break;
     case ReplyMessage::DISCONNECT:
-        throw ServerDisconnectedError{ response.error };
+        throw ServerDisconnectedError{ message.error_ };
         break;
 
-    // These shouldn't happen, even in the network error case - they indicate a
-    // programmatic error in the Async handler;
+    // These shouldn't happen, even in the network error_ case - they indicate a
+    // programmatic error_ in the Async handler;
     case ReplyMessage::IN_FLIGHT:
     case ReplyMessage::PENDING:
         LOG_FROM(
             LOG_ERROR,
             "ReqSvrRequest::WaitForMessage",
             "ReqSvrRequest completed with a non terminal state!");
-        throw ServerDisconnectedError{ response.error };
+        throw ServerDisconnectedError{ message.error_ };
         break;
     }
-    return GetMessage();
+    return message;
 }
 
-void ReqSvrRequest::OnComplete(ReplyMessage& reply) {
-    statusFlag.set_value(1);
-    ReleaseKeepAlive();
+const std::string& ReqSvrRequest::onOpen() {
+    message.state_ = ReplyMessage::IN_FLIGHT;
+    return payload;
 }
 
-void ReqSvrRequest::ReleaseKeepAlive() {
-    // Keep alive may be the only thing keeping the object alive, but we're in
-    // the middle of a callback from the Client object.
-    //
-    // We therefore push the keepAlive token into a tasklet in the io_service's
-    // queue. Sometime after this callback is complete the tasklet will be run
-    // and the final reference released - safely killing the object when it is
-    // not being used.
-    //
-    // Note that if for some reason the io_service is stopped, we'll be kept
-    // alive until the service is reset, or destroyed. This should be perfectly
-    // acceptable...
-    std::shared_ptr<ReqSvrRequest> flushKeepAlive = std::move(keepAlive);
-    io_service.post([flushKeepAlive] () -> void {
-        // Nothing to do - io_service will now tidy the tasklet, releasing our
-        // keepalive...
-    });
+void ReqSvrRequest::onInvalidRequest(std::string err) {
+    message.state_ = ReplyMessage::INVALID_URI;
+    message.error_ = std::move(err);
+    statusFlag.set_value(false);
+}
+
+void ReqSvrRequest::onComplete() {
+    onTerminate();
+}
+
+void ReqSvrRequest::onTerminate() {
+    switch (message.state_)
+    {
+    case ReplyMessage::IN_FLIGHT:
+    case ReplyMessage::PENDING:
+        message.state_ = ReplyMessage::DISCONNECT;
+        statusFlag.set_value(false);
+        break;
+
+    case ReplyMessage::REJECTED:
+    case ReplyMessage::COMPLETE:
+    case ReplyMessage::INVALID_URI:
+    case ReplyMessage::DISCONNECT:
+        // nothing to do
+        break;
+    }
+}
+
+void ReqSvrRequest::onMessage(std::string msg) {
+    ErrorFields fields;
+
+    if (isError(msg, fields)) {
+        message.state_ = ReplyMessage::REJECTED;
+        message.content_ = fields.errorText;
+        message.code_ = fields.errorCode;
+    } else {
+        message.state_ = ReplyMessage::COMPLETE;
+        message.content_ = msg;
+    }
+
+    statusFlag.set_value(true);
+}
+
+
+ReqSvrRequest::ReqSvrRequestError::ReqSvrRequestError(std::string msg)
+   : msg_(std::move(msg))
+{
+
 }

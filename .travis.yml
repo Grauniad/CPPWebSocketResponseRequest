@@ -24,10 +24,11 @@ install:
   - ./buildDeps.sh
   - pip install --user cpp-coveralls
 
-script: 
+script:
   - ./buildFromDeps.sh
   - cd Build
   - make test
   - ctest -T Memcheck
+  - cat Testing/Temporary/MemoryChecker.*.log
   - cd ..
   - ./CMakeUtils/travis/doCoverage.sh
