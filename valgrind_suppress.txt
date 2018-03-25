@@ -1,29 +1,10 @@
 {
-   TODO This looks like an issue with websocketpp, but further investigation is required...
-   Memcheck:Param
-   epoll_pwait(sigmask)
-   fun:epoll_pwait
-}
-
-{
-   TODO - See note in the test file. This *is* an issue, but is considered likely to only happen on process shut-down
-   Memcheck:Leak
-   match-leak-kinds: definite
-   ...
-   fun:_ZN13ReqSvrRequest10NewRequest*
-   fun:_ZN8IOThread7Request*
-   fun:_ZN32REQ_CLIENT_AbandonedRequest_*
-   ...
-   fun:main
-}
-
-{
-   TODO - This global string only seems to turn up on Trusty, but given it is a global string its not a serious concern
-   Memcheck:Leak
-   match-leak-kinds: possible
-   ...
-   fun:_ZNSsC1EPKcRKSaIcE
-   ...
-   fun:__libc_csu_init
-   ...
+   TODO: Mem check on exit issue showing up on Travis.
+   Memcheck:Free
+   fun:free
+   fun:__libc_freeres
+   fun:_vgnU_freeres
+   fun:__run_exit_handlers
+   fun:exit
+   fun:(below main)
 }

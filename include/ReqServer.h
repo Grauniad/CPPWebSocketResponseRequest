@@ -21,7 +21,7 @@ public:
         std::string errMsg;
     };
 
-    // Unrecoverable error - terminate the server
+    // Unrecoverable error_ - terminate the server
     struct FatalError {
         int code;
         std::string errMsg;
@@ -133,7 +133,7 @@ public:
         std::string message;
     };
 
-    // Unrecoverable error has occurred - close down the server as gracefully as
+    // Unrecoverable error_ has occurred - close down the server as gracefully as
     // we can and, then throw an exception out of HandleRequests
     void FatalError(int code, std::string message);
 private:

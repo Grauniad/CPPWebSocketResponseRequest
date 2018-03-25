@@ -99,7 +99,7 @@ TEST(REQ_CLIENT, SuccessfulRequest)
     // Request is being managed on the IO Thread - wait for it to retrieve the
     // response and then check it got the right value...
     auto response = request->WaitForMessage();
-    ASSERT_EQ(response.content, payload);
+    ASSERT_EQ(response.content_, payload);
     ASSERT_EQ(response.state_, ReplyMessage::COMPLETE);
 }
 
@@ -129,8 +129,8 @@ TEST(REQ_CLIENT, RejectedRequest)
     // response and then check it got the right value...
     auto response = request->WaitForMessage();
     ASSERT_EQ(response.state_, ReplyMessage::REJECTED);
-    ASSERT_EQ(response.code, 12);
-    ASSERT_EQ(response.content, payload);
+    ASSERT_EQ(response.code_, 12);
+    ASSERT_EQ(response.content_, payload);
 }
 
 // Handle malformed rejectes from the server
@@ -163,11 +163,11 @@ TEST(REQ_CLIENT, MalformedReject)
     // By definition a mal-formed reject is not actually a reject at all, just
     // an vanilla reply
     ASSERT_EQ(response.state_, ReplyMessage::COMPLETE);
-    ASSERT_EQ(response.code, 0);
-    ASSERT_EQ(response.content, payload);
+    ASSERT_EQ(response.code_, 0);
+    ASSERT_EQ(response.content_, payload);
 }
 
-// A sensible error is thrown if the request URI is garbage
+// A sensible error_ is thrown if the request URI is garbage
 TEST(REQ_CLIENT, InvalidURI)
 {
     IOThread clientThread;
@@ -181,7 +181,7 @@ TEST(REQ_CLIENT, InvalidURI)
     ASSERT_THROW(request->WaitForMessage(), ReqSvrRequest::InvalidURIError);
 }
 
-// A sensible error is thrown if the server cannot be contacted
+// A sensible error_ is thrown if the server cannot be contacted
 TEST(REQ_CLIENT, ServerDown)
 {
     IOThread clientThread;
@@ -226,8 +226,13 @@ TEST(REQ_CLIENT, AbandonedRequest)
     // now resume the server...
     goFlag.set_value(true);
 
-    using namespace std::chrono_literals;
-    std::this_thread::sleep_for(5ms);
+    std::promise<bool> doneFlag;
+
+    // and wait for it to terminate...
+    server.PostTask( [&] () {
+        doneFlag.set_value(true);
+    });
+    doneFlag.get_future().wait();
 }
 
 //TODO: There is a corner case here where the request handle is discarded as the

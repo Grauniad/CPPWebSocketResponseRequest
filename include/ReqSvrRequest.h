@@ -2,38 +2,58 @@
 #define DEV_TOOLS_CPP_LIBRARIES_LIBWEBSOCKETS_REQSVRREQUEST_H_
 
 #include <future>
-#include "AsyncReqSvrRequest.h"
+#include "IOneShotConnectionConsumer.h"
 
-class ReqSvrRequest: public AsyncReqSvrRequest {
+// TODO: Once we've done the initial migration, move this out to
+//       somewhere less in the way.
+struct ReplyMessage {
+public:
+    ReplyMessage(): state_(PENDING), code_(0) {}
+    enum STATE {
+        PENDING,
+        IN_FLIGHT,
+        COMPLETE,
+        DISCONNECT,
+        INVALID_URI,
+        REJECTED
+    };
+    std::string content_;
+    std::string error_;
+    STATE       state_;
+    int         code_;
+};
+
+class ReqSvrRequest: public IOneShotConnectionConsumer {
 public:
     /**
-     * Initiate a new request on the IO thread (io_service), and return a handle
-     * to the access the result.
+     * Configure a new request.
      *
-     * If the result is not interesting, the handle may be safely discarded -
-     * the request will be kept alive until the network communication has been
-     * resolved.
+     * NOTE: To actually trigger the request this configuration will
+     *       need to be provided to some kind of client. (Usually the
+     *       WebPPSingleThreadOneShotClient
      *
-     * The result of the request may be access via the blocking WaitForMessage
-     * method.
+     * @param reqName   The name of the request to send
+     * @param data      The payload (usually the request JSON)
      */
-    static std::shared_ptr<ReqSvrRequest> NewRequest(
-        boost::asio::io_service& io_service,
-        const std::string& uri,
-        const std::string& reqName,
-        const std::string& data);
+    ReqSvrRequest (const std::string& reqName, const std::string& data);
 
     virtual ~ReqSvrRequest();
 
+
     /**
-     * Waits for request to complete before returning the result
+     * Waits (blocks the current thread) for request to complete before
+     * returning the result
      *
      * In the event of a failure an instance ReqSvrRequestError will be thrown
+     *
+     * NOTE: If the request configuration is not passed to come kind of client
+     *       to actually trigger the request, this will block forever.
      */
     virtual const ReplyMessage& WaitForMessage();
 
+    // TODO: Tidy these errors up...
     struct ReqSvrRequestError {
-        ReqSvrRequestError(std::string msg): msg_(std::move(msg)) {}
+        ReqSvrRequestError(std::string msg);
         std::string msg_;
     };
 
@@ -45,24 +65,25 @@ public:
     using ServerDisconnectedError = StateSpecificError<ReplyMessage::DISCONNECT>;
 
 protected:
-    // Callback triggered Once we have the response
-    virtual void OnComplete(ReplyMessage& reply) override;
-
     std::promise<int> statusFlag;
     std::future<int>  statusFuture;
-    boost::asio::io_service& io_service;
+    ReplyMessage      message;
 
 private:
-    // Life cyle management - see comments in FactoryMethod and ReleaseKeepAlive
-    // bodies.
-    void ReleaseKeepAlive();
-    ReqSvrRequest(
-        boost::asio::io_service& io_service,
-        const std::string& uri,
-        const std::string& reqName,
-        const std::string& data);
+    // Interface required by the IOneShotConnectionConsumer
+    const std::string& onOpen () override;
 
-    std::shared_ptr<ReqSvrRequest> keepAlive;
+    void onInvalidRequest (std::string err) override;
+
+    void onTerminate () override;
+
+    void onComplete () override;
+
+    void onMessage (std::string) override;
+
+    // Data
+    std::string payload;
+
 };
 
 #endif /* DEV_TOOLS_CPP_LIBRARIES_LIBWEBSOCKETS_REQSVRREQUEST_H_ */
