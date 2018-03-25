@@ -11,12 +11,13 @@
 #include <atomic>
 
 #include "ReqSvrRequest.h"
+#include "WebPPSingleThreadOneShotClient.h"
 
 /**
  * Spawns a new IO thread, which can be used to create
  * new requests
  */
-class IOThread {
+class IOThread: public IPostable {
 public:
     /**
      * Start the new thread
@@ -49,10 +50,8 @@ public:
             const std::string& requestName,
             const std::string& jsonData);
 
-    /**
-     * Spawn a new thread to handle a websocket stream
-     */
 
+    virtual void PostTask(const Task& t);
 private:
     void IOLoop();
 
@@ -66,6 +65,7 @@ private:
 
     boost::asio::io_service io_service;
     std::thread io_thread;
+    WebPPSingleThreadOneShotClient requestClient;
 };
 
 #endif

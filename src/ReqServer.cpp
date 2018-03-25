@@ -59,10 +59,10 @@ void on_message(RequestServer* s, Server* raw_server, websocketpp::connection_hd
         websocketpp::lib::error_code ec;
         raw_server->get_con_from_hdl(hdl)->close(
                 websocketpp::close::status::internal_endpoint_error,
-                "Fatal error",
+                "Fatal error_",
                 ec);
         SLOG_FROM(LOG_VERBOSE,"RequestServer::on_message",
-            "An unrecoverable error occurred - shutting down the server");
+            "An unrecoverable error_ occurred - shutting down the server");
         s->FatalError(fatal.code, fatal.errMsg);
     }
 }
