@@ -73,3 +73,62 @@ target_link_libraries(requestReply CPPWebSocketResponseRequest GTest::GTest)
 
 enable_testing()
 add_test(requestReply requestReply)
+
+#
+# NOTE: Valgrind must be configured *before* testing is imported
+#
+set(MEMORYCHECK_COMMAND_OPTIONS "--gen-suppressions=all --suppressions=${CPPWebSocketResponseRequest_SOURCE_DIR}/valgrind_suppress.txt --track-origins=yes --freelist-vol=2000000000 --error-exitcode=1 --track-fds=yes --num-callers=50 --fullpath-after= --trace-children=yes --leak-check=full" )
+find_program(MEMORYCHECK_COMMAND valgrind )
+include (CTest)
+
+#
+# Installation instructions
+#
+install(TARGETS CPPWebSocketResponseRequest EXPORT CPPWebSocketResponseRequestTargets
+    ARCHIVE  DESTINATION lib
+    INCLUDES DESTINATION include
+    PUBLIC_HEADER DESTINATION include
+)
+
+install (EXPORT CPPWebSocketResponseRequestTargets
+    FILE         CPPWebSocketResponseRequestTargets.cmake
+    NAMESPACE    CPPWebSocketResponseRequest::
+    DESTINATION  lib/cmake/CPPWebSocketResponseRequest
+)
+
+#
+# Define our package version
+#
+include(CMakePackageConfigHelpers)
+write_basic_package_version_file("CPPWebSocketResponseRequestConfigVersion.cmake"
+    VERSION       0.1
+    COMPATIBILITY SameMajorVersion
+)
+install (
+    FILES       ${CPPWebSocketResponseRequest_BINARY_DIR}/CPPWebSocketResponseRequestConfigVersion.cmake
+    DESTINATION lib/cmake/CPPWebSocketResponseRequest
+)
+
+#
+# Finally export the Config which CMake will use
+# when looking for matching libraries to link against.
+#
+install (
+    FILES       CPPWebSocketResponseRequestConfig.cmake
+    DESTINATION lib/cmake/CPPWebSocketResponseRequest
+)
+
+#
+# Configure Coverage Build
+#
+SET(CMAKE_CXX_FLAGS_COVERAGE
+    "${GCC_DEBUG_FLAGS} -fprofile-arcs -ftest-coverage"
+    CACHE STRING "Flags used by the C++ compiler during coverage builds."
+    FORCE )
+SET(CMAKE_C_FLAGS_COVERAGE
+    "${GCC_DEBUG_FLAGS} -fprofile-arcs -ftest-coverage"
+    CACHE STRING "Flags used by the C compiler during coverage builds."
+    FORCE )
+MARK_AS_ADVANCED(
+    CMAKE_CXX_FLAGS_COVERAGE
+    CMAKE_C_FLAGS_COVERAGE)
