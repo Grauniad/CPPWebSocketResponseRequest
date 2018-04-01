@@ -13,11 +13,11 @@ find_package(DevToolsLog 0.1 REQUIRED)
 find_package(OSDevTools 0.1 REQUIRED)
 find_package(UtilTime 0.1 REQUIRED)
 find_package(Boost 0.1 REQUIRED COMPONENTS system thread)
-find_package(WEBSOCKETPP 0.7.0 REQUIRED)
+find_package(WEBSOCKETPP 0.6.0 REQUIRED)
 find_package(OpenSSL REQUIRED)
 
 add_library(CPPWebSocketResponseRequest STATIC
-        include/ReqFileList.h
+    include/ReqFileList.h
     include/ReqServer.h
     include/ReqSvrRequest.h
     include/WebPPSingleThreadOneShotClient.h
@@ -25,8 +25,8 @@ add_library(CPPWebSocketResponseRequest STATIC
     include/http_request.h
     include/io_thread.h
     include/stream_client.h
-        include/IOneShotConnectionConsumer.h
-        src/http_client.cpp
+    include/IOneShotConnectionConsumer.h
+    src/http_client.cpp
     src/http_request.cpp
     src/io_thread.cpp
     src/ReqFileList.cpp
@@ -52,16 +52,15 @@ target_include_directories(CPPWebSocketResponseRequest PUBLIC
 )
 
 set_property(TARGET CPPWebSocketResponseRequest PROPERTY PUBLIC_HEADER
-    ${CPPWebSocketResponseRequest_SOURCE_DIR}/include/AsyncReqSvrRequest.h
     ${CPPWebSocketResponseRequest_SOURCE_DIR}/include/ReqFileList.h
     ${CPPWebSocketResponseRequest_SOURCE_DIR}/include/ReqServer.h
     ${CPPWebSocketResponseRequest_SOURCE_DIR}/include/ReqSvrRequest.h
-    ${CPPWebSocketResponseRequest_SOURCE_DIR}/include/WebPPClientnt.h
+    ${CPPWebSocketResponseRequest_SOURCE_DIR}/include/WebPPSingleThreadOneShotClient.h
     ${CPPWebSocketResponseRequest_SOURCE_DIR}/include/http_client.h
     ${CPPWebSocketResponseRequest_SOURCE_DIR}/include/http_request.h
     ${CPPWebSocketResponseRequest_SOURCE_DIR}/include/io_thread.h
     ${CPPWebSocketResponseRequest_SOURCE_DIR}/include/stream_client.h
-    ${CPPWebSocketResponseRequest_SOURCE_DIR}/include/IMessageConsumer.h
+    ${CPPWebSocketResponseRequest_SOURCE_DIR}/include/IOneShotConnectionConsumer.h
 )
 
 #
