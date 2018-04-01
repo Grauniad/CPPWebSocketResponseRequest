@@ -235,11 +235,6 @@ TEST(REQ_CLIENT, AbandonedRequest)
     doneFlag.get_future().wait();
 }
 
-//TODO: There is a corner case here where the request handle is discarded as the
-//      IO Thread is being destroyed. If this happens the request is leaked, but
-//      its a reasonable assumption that this the process is about to terminate
-//      anyway, so for the time being its been left as is.
-
 /*
  * Handle server failure during request processing
  */
