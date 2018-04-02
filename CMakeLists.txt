@@ -21,13 +21,9 @@ add_library(CPPWebSocketResponseRequest STATIC
     include/ReqServer.h
     include/ReqSvrRequest.h
     include/WebPPSingleThreadOneShotClient.h
-    include/http_client.h
-    include/http_request.h
     include/io_thread.h
     include/stream_client.h
     include/IOneShotConnectionConsumer.h
-    src/http_client.cpp
-    src/http_request.cpp
     src/io_thread.cpp
     src/ReqFileList.cpp
     src/ReqServer.cpp
@@ -56,8 +52,6 @@ set_property(TARGET CPPWebSocketResponseRequest PROPERTY PUBLIC_HEADER
     ${CPPWebSocketResponseRequest_SOURCE_DIR}/include/ReqServer.h
     ${CPPWebSocketResponseRequest_SOURCE_DIR}/include/ReqSvrRequest.h
     ${CPPWebSocketResponseRequest_SOURCE_DIR}/include/WebPPSingleThreadOneShotClient.h
-    ${CPPWebSocketResponseRequest_SOURCE_DIR}/include/http_client.h
-    ${CPPWebSocketResponseRequest_SOURCE_DIR}/include/http_request.h
     ${CPPWebSocketResponseRequest_SOURCE_DIR}/include/io_thread.h
     ${CPPWebSocketResponseRequest_SOURCE_DIR}/include/stream_client.h
     ${CPPWebSocketResponseRequest_SOURCE_DIR}/include/IOneShotConnectionConsumer.h

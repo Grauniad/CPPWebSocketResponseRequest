@@ -1,7 +1,6 @@
 #ifndef DEV_TOOLS_CPP_LIBS_WEBSOCKETS_IO_THREAD_H__
 #define DEV_TOOLS_CPP_LIBS_WEBSOCKETS_IO_THREAD_H__
 
-#include <http_request.h>
 #include <stream_client.h>
 #include <boost/asio.hpp>
 #include <memory>
@@ -9,6 +8,7 @@
 #include <condition_variable>
 #include <mutex>
 #include <atomic>
+#include <IPostable.h>
 
 #include "ReqSvrRequest.h"
 #include "WebPPSingleThreadOneShotClient.h"
@@ -24,23 +24,7 @@ public:
      */ 
     IOThread();
 
-    virtual ~IOThread();
-
-    /**
-     * Request content via a one-shot HTTP request.
-     */
-    std::shared_ptr<HTTPRequest> HTTPSRequest(
-        const std::string& server,
-        const std::string& path);
-
-    /**
-     * Request content via a one-shot HTTP request.
-     */
-    std::shared_ptr<HTTPRequest> HTTPSPOST(
-        const std::string& server,
-        const std::string& path,
-        const std::string& data,
-        const AsyncHTTPSClient::HeaderMap& headers);
+    ~IOThread() override;
 
     /**
      * Request content via a one-short request to a ReqServer
@@ -51,7 +35,7 @@ public:
             const std::string& jsonData);
 
 
-    virtual void PostTask(const Task& t);
+    void PostTask(const Task& t) override;
 private:
     void IOLoop();
 
