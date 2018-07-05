@@ -1,0 +1,15 @@
+{
+  "name": "wsrequestclient",
+  "version": "0.1.0",
+  "description": "CPPWebSocketResponseRequest client. This package provides a small utility for dispatching requests to, and subscribing to streams from the server",
+  "main": "WSRequest.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Luke Humphreys",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "nodeproxy": "^1.0.0",
+    "ws": "^5.2.1"
+  }
+}
