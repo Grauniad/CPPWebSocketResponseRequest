@@ -13,7 +13,7 @@ find_package(DevToolsLog 0.1 REQUIRED)
 find_package(OSDevTools 0.1 REQUIRED)
 find_package(UtilTime 0.1 REQUIRED)
 find_package(Boost 0.1 REQUIRED COMPONENTS system thread)
-find_package(WEBSOCKETPP 0.6.0 REQUIRED)
+find_package(WEBSOCKETPP 0.8.0 REQUIRED)
 find_package(OpenSSL REQUIRED)
 
 add_library(CPPWebSocketResponseRequest STATIC
@@ -82,13 +82,13 @@ install(TARGETS CPPWebSocketResponseRequest EXPORT CPPWebSocketResponseRequestTa
     ARCHIVE  DESTINATION lib
     INCLUDES DESTINATION include
     PUBLIC_HEADER DESTINATION include
-)
+    )
 
 install (EXPORT CPPWebSocketResponseRequestTargets
     FILE         CPPWebSocketResponseRequestTargets.cmake
     NAMESPACE    CPPWebSocketResponseRequest::
     DESTINATION  lib/cmake/CPPWebSocketResponseRequest
-)
+    )
 
 #
 # Define our package version
