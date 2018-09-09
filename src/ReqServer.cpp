@@ -7,6 +7,7 @@
 
 #include <SimpleJSON.h>
 #include <logger.h>
+#include <OSTools.h>
 
 /**************************************************************
  *                Utilities
@@ -276,8 +277,14 @@ void RequestServer::HandleRequests(unsigned short port) {
         // Allow address re-use so that orphaned sessions from an old server
         // which are about to be killed off don't prevent us starting up.
         // NOTE: This will *not* allow two active server listeners (see
-        //       NoDoublePortBind test)
+        //       NoDoublePortBind test)...
         requestServer_.set_reuse_addr(true);
+
+        // ... unless we're on Windows, which  can't do POSIX properly.
+        // (On WSL NoDoublePortBind will fail since it incorrectly allows the bind)
+        if (OS::IsWSLSystem()) {
+            requestServer_.set_reuse_addr(false);
+        }
 
         requestServer_.listen(port);
 
