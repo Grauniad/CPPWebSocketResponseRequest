@@ -103,6 +103,33 @@ TEST(REQ_CLIENT, SuccessfulRequest)
     ASSERT_EQ(response.state_, ReplyMessage::COMPLETE);
 }
 
+TEST(REQ_CLIENT, ForceShutdown)
+{
+    WorkerThread serverThread;
+    RequestServer server;
+    IOThread clientThread;
+
+    std::promise<bool> stopFlag;
+    auto futureStop = stopFlag.get_future();
+
+    // Request server's main loop is blocking, start up on a slave thread...
+    serverThread.PostTask([&] () -> void {
+        server.HandleRequests(serverPort);
+        stopFlag.set_value(true);
+    });
+    serverThread.Start();
+
+    // wait for the server to spin up...
+    server.WaitUntilRunning();
+
+    // Ok we're all set - trigger the request
+    const std::string payload = "Hello World!";
+    auto request =
+            clientThread.Request(serverUri, "stop-listening", "");
+
+    ASSERT_TRUE(futureStop.get());
+}
+
 // Handle legitmate rejects from the server
 TEST(REQ_CLIENT, RejectedRequest)
 {

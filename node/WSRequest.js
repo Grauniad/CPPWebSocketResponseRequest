@@ -40,14 +40,14 @@ function wsrequest_NewRequestManager(url) {
             activeRequests.splice(id,1);
         }
 
-        function getNextId() { 
+        function getNextId() {
             "use strict";
             reqNum += 1;
             return reqNum;
         }
 
         return {
-            newRequest: function (reqName, msg, context) { 
+            newRequest: function (reqName, msg, context) {
                 "use strict";
                 var reqid = getNextId();
                 context._onDone = function () { deleteRequest(reqid); }
@@ -57,7 +57,19 @@ function wsrequest_NewRequestManager(url) {
                 return reqid;
             },
 
-            newSubscription: function (reqName, msg, context) { 
+            dispatchKill: function () {
+                "use strict";
+                var reqid = getNextId();
+                let context = {};
+                context._onDone = function () { deleteRequest(reqid); }
+                context._server = url;
+                context._one_shot = true;
+                context._request = "stop-listening"
+                activeRequests[reqid] = new WSRequest("", "", context);
+                return reqid;
+            },
+
+            newSubscription: function (reqName, msg, context) {
                 "use strict";
                 var reqid = getNextId(), request = null;
                 context._onDone = function () { deleteRequest(reqid); }

@@ -50,7 +50,10 @@ ReqSvrRequest::ReqSvrRequest(
   : statusFuture(statusFlag.get_future())
 {
     std::stringstream payloadStream;
-    payloadStream << reqName << " " << data;
+    payloadStream << reqName;
+    if (data.empty() == false) {
+        payloadStream << " " << data;
+    }
     payload = payloadStream.str();
 }
 

@@ -43,6 +43,7 @@ void on_message(RequestServer* s, Server* raw_server, websocketpp::connection_hd
     try {
         if (msg->get_payload() == "stop-listening") {
             raw_server->stop_listening();
+            raw_server->stop();
         } else {
             SLOG_FROM(LOG_VERBOSE,">> ReqServer::on_message",
                 "Received message from: " << hdl.lock().get() << endl <<
