@@ -31,17 +31,11 @@ StreamClient::StreamClient(std::string url, std::string subName, std::string sub
     // Register our handlers
     m_endpoint.set_message_handler(bind(&StreamClient::on_message,this,::_1,::_2));
     m_endpoint.set_open_handler(bind(&StreamClient::on_sub_open,this,::_1));
-    m_endpoint.set_close_handler(bind(&StreamClient::on_close,this,::_1));
     m_endpoint.set_pong_timeout_handler(bind(&StreamClient::on_pong_timeout,this, ::_1, ::_2));
-    m_endpoint.set_fail_handler(bind(&StreamClient::on_close,this,::_1));
 }
 
 void StreamClient::on_sub_open(websocketpp::connection_hdl hdl) {
     m_endpoint.send(hdl, subName + " " + subBody, websocketpp::frame::opcode::text);
-}
-
-void StreamClient::on_close(websocketpp::connection_hdl hdl) {
-    m_endpoint.stop();
 }
 
 void StreamClient::on_message(websocketpp::connection_hdl hdl, message_ptr msg)

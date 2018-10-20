@@ -72,10 +72,8 @@ private:
     void on_sub_open(websocketpp::connection_hdl hdl);
 
     /**
-     * Call-back to notify us of a close event
+     * Call-back when a ping request has timed out
      */
-    void on_close(websocketpp::connection_hdl hdl);
-
     void on_pong_timeout(websocketpp::connection_hdl hdl, std::string msg);
 
     /**
