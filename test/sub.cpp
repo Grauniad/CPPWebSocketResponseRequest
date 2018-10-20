@@ -92,9 +92,11 @@ public:
     }
 
     void TearDown () {
-        clientPub.Stop();
-        clientThread.DoTask([=] () -> void {
-        });
+        if (clientPub.Running()) {
+            clientPub.Stop();
+            clientThread.DoTask([=] () -> void {
+            });
+        }
     }
 protected:
     std::shared_ptr<TestHandler> handler;
@@ -152,9 +154,11 @@ public:
 
     void TearDown() override {
         SubTest::TearDown();
-        clientPub2.Stop();
-        clientThread2.DoTask([=] () -> void {
-        });
+        if (clientPub2.Running()) {
+            clientPub2.Stop();
+            clientThread2.DoTask([=] () -> void {
+            });
+        }
     }
 protected:
     const std::string      logonMsg;
@@ -217,9 +221,11 @@ public:
 
     void TearDown() override {
         SubTestSecondClient::TearDown();
-        clientPub3.Stop();
-        clientThread3.DoTask([=] () -> void {
-        });
+        if (clientPub3.Running()) {
+            clientPub3.Stop();
+            clientThread3.DoTask([=] () -> void {
+            });
+        }
     }
 protected:
     const std::string      logonMsg3;
