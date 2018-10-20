@@ -122,6 +122,9 @@ TEST_F(SubTest, NewMessage) {
 
 TEST_F(SubTest, AbortedClient) {
     clientPub.Stop();
+    clientThread.DoTask([] () -> void {
+        // flush...
+    });
     const std::string message = "New Message to send";
     handler->Publish(message);
 
@@ -339,5 +342,5 @@ TEST_F(SubErrorTest, EarlyServerAbort) {
     Time timeout;
 
     ASSERT_GE(timeout.DiffUSecs(start), 100 * 1000);
-    ASSERT_LE(timeout.DiffUSecs(start), 101 * 1000);
+    ASSERT_LE(timeout.DiffUSecs(start), 200 * 1000);
 }
