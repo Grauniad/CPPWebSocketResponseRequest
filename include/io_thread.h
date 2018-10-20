@@ -1,7 +1,6 @@
 #ifndef DEV_TOOLS_CPP_LIBS_WEBSOCKETS_IO_THREAD_H__
 #define DEV_TOOLS_CPP_LIBS_WEBSOCKETS_IO_THREAD_H__
 
-#include <stream_client.h>
 #include <boost/asio.hpp>
 #include <memory>
 #include <thread>

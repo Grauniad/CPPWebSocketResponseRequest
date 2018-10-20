@@ -6,6 +6,7 @@
 #include <websocketpp/client.hpp>
 #include <atomic>
 #include <thread>
+#include <future>
 
 /**
  * Subscribes to a websocket and triggers a call-back for each message.
@@ -16,14 +17,31 @@
 class StreamClient {
 public:
     /**
-     * C'tor - connect to the specified url
+     * C'tor - variant for connecting to a SubsriptionServer
+     *
+     * connect to the specified url, and logon with the specified request and message
      */
-    StreamClient(const std::string& url);
+    StreamClient(
+        std::string url,
+        std::string subName,
+        std::string subBody
+        );
+
+    virtual ~StreamClient();
 
     /**
      * Indicates if the query is currently live
      */
     bool Running();
+
+    /**
+     * Wait until the server is running...
+     */
+    bool WaitUntilRunning();
+
+    void Ping(unsigned int timeout);
+
+    struct InvalidUrlException {};
 
 protected: 
     /**
@@ -35,6 +53,7 @@ protected:
      * Stop the event loop
      */
     void Stop();
+    void StopNonBlock();
     
     /**
      * Call-back triggered when a new message is received.
@@ -45,40 +64,36 @@ protected:
 
 private:
     typedef websocketpp::config::asio_tls_client::message_type::ptr message_ptr;
-    typedef websocketpp::lib::shared_ptr<boost::asio::ssl::context> context_ptr;
 
 
     /**
-     * Call-back to intialise the encryption
+     * Call-back to notify us of a successful subscription connection
      */
-    context_ptr on_tls_init(websocketpp::connection_hdl);
+    void on_sub_open(websocketpp::connection_hdl hdl);
 
     /**
-     * Call-back to notify us of a successful connection
+     * Call-back when a ping request has timed out
      */
-    void on_open(websocketpp::connection_hdl hdl);
+    void on_pong_timeout(websocketpp::connection_hdl hdl, std::string msg);
 
     /**
      * Call-back triggered by the arrival of a new message
      */
     void on_message(websocketpp::connection_hdl hdl, message_ptr msg);
 
-    typedef websocketpp::client<websocketpp::config::asio_tls_client> client;
+    typedef websocketpp::client<websocketpp::config::asio_client> client;
 
     std::atomic<bool>   running;
     client m_endpoint;
     client::connection_ptr con;
+    std::string        subName;
+    std::string        subBody;
+    std::string        url;
+    std::promise<bool> startFlag;
+    std::future<bool>  futureStart;
+    std::promise<bool> stopFlag;
+    std::future<bool>  futureStop;
 
 };
-
-class StreamClientThread: public StreamClient {
-public:
-    StreamClientThread(const std::string& url);
-
-    ~StreamClientThread();
-private:
-    std::thread io_thread;
-};
-
 
 #endif

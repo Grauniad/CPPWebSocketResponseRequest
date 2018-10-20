@@ -29,6 +29,6 @@ script:
   - cd Build
   - make test
   - ctest -T Memcheck
-  - cat Testing/Temporary/MemoryChecker.*.log
+  - cat Testing/Temporary/*.log
   - cd ..
   - ./CMakeUtils/travis/doCoverage.sh

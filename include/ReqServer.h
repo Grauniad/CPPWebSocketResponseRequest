@@ -89,9 +89,8 @@ public:
              const std::string& requestName, 
              std::unique_ptr<RequestReplyHandler> handler);
 
-    void AddHandler(
-             const std::string& requestName, 
-             std::unique_ptr<SubscriptionHandler> handler);
+    void AddHandler( const std::string& requestName,
+                     std::shared_ptr<SubscriptionHandler> handler);
 
     /**
      * Run the event loop, handle any incoming requests or posted tasks
@@ -141,6 +140,7 @@ private:
      * Bail out of the event loop...
      */
     void Stop();
+    void StopNoBlock();
 
     std::string HandleRequestReplyMessage(
                     const std::string& reqName,
@@ -162,12 +162,25 @@ private:
     std::future<bool>  stopped;
 
     std::map<std::string,std::unique_ptr<RequestReplyHandler>> req_handlers;
-    std::map<std::string,std::unique_ptr<SubscriptionHandler>> sub_handlers;
+    std::map<std::string,std::shared_ptr<SubscriptionHandler>> sub_handlers;
 
     /*
      * Maps an active connection to
      */
-    std::map<void*,SubscriptionHandler::RequestHandle> conn_map;
+    struct StoredHdl{
+        StoredHdl(websocketpp::connection_hdl hdl)
+           : raw(hdl.lock().get())
+           , hdl(hdl) {}
+
+        void * raw;
+        websocketpp::connection_hdl hdl;
+
+        bool operator<(const StoredHdl& rhs) const {
+            return (raw < rhs.raw);
+        }
+    };
+    std::mutex mapGuard;
+    std::map<StoredHdl,SubscriptionHandler::RequestHandle> conn_map;
 
     // Error tracking
     bool        failed;
