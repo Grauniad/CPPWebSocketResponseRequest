@@ -6,6 +6,7 @@
 #include <websocketpp/client.hpp>
 #include <atomic>
 #include <thread>
+#include <future>
 
 /**
  * Subscribes to a websocket and triggers a call-back for each message.
@@ -16,14 +17,27 @@
 class StreamClient {
 public:
     /**
-     * C'tor - connect to the specified url
+     * C'tor - variant for connecting to a SubsriptionServer
+     *
+     * connect to the specified url, and logon with the specified request and message
      */
-    StreamClient(const std::string& url);
+    StreamClient(
+        std::string url,
+        std::string subName,
+        std::string subBody
+        );
+
+    virtual ~StreamClient();
 
     /**
      * Indicates if the query is currently live
      */
     bool Running();
+
+    /**
+     * Wait until the server is running...
+     */
+    bool WaitUntilRunning();
 
 protected: 
     /**
@@ -45,13 +59,7 @@ protected:
 
 private:
     typedef websocketpp::config::asio_tls_client::message_type::ptr message_ptr;
-    typedef websocketpp::lib::shared_ptr<boost::asio::ssl::context> context_ptr;
 
-
-    /**
-     * Call-back to intialise the encryption
-     */
-    context_ptr on_tls_init(websocketpp::connection_hdl);
 
     /**
      * Call-back to notify us of a successful connection
@@ -59,26 +67,28 @@ private:
     void on_open(websocketpp::connection_hdl hdl);
 
     /**
+     * Call-back to notify us of a successful subscription connection
+     */
+    void on_sub_open(websocketpp::connection_hdl hdl);
+
+    /**
      * Call-back triggered by the arrival of a new message
      */
     void on_message(websocketpp::connection_hdl hdl, message_ptr msg);
 
-    typedef websocketpp::client<websocketpp::config::asio_tls_client> client;
+    typedef websocketpp::client<websocketpp::config::asio_client> client;
 
     std::atomic<bool>   running;
     client m_endpoint;
     client::connection_ptr con;
+    std::string        subName;
+    std::string        subBody;
+    std::string        url;
+    std::promise<bool> startFlag;
+    std::future<bool>  futureStart;
+    std::promise<bool> stopFlag;
+    std::future<bool>  futureStop;
 
 };
-
-class StreamClientThread: public StreamClient {
-public:
-    StreamClientThread(const std::string& url);
-
-    ~StreamClientThread();
-private:
-    std::thread io_thread;
-};
-
 
 #endif

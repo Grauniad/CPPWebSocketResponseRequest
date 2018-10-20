@@ -85,7 +85,7 @@ public:
         Server* s,
         websocketpp::connection_hdl c)
 
-    : request(req), serv(s), conn(serv->get_con_from_hdl(c)), open(true)
+    : request(req), serv(s), conn(c), open(true)
     {
     }
 
@@ -99,10 +99,9 @@ public:
      * Send a data update, a JSON message, down the pipe
      */
     void SendMessage(const std::string& msg) {
-        SLOG_FROM(LOG_VERBOSE,"<< Request::SendMessage",
-        "Sending Message to:" << conn.get() << endl <<
-        "Message: " << msg << endl);
-        serv->send(conn,msg,websocketpp::frame::opcode::TEXT);
+        if (Ok()) {
+            serv->send(conn,msg,websocketpp::frame::opcode::TEXT);
+        }
     }
 
     bool Ok() const { return open; }
@@ -114,7 +113,7 @@ public:
 private:
     std::string                 request;
     Server*                     serv;
-    Server::connection_ptr      conn;
+    websocketpp::connection_hdl conn;
     bool                        open;
 };
 
@@ -144,9 +143,9 @@ void RequestServer::AddHandler(
 
 void RequestServer::AddHandler(
          const std::string& requestName, 
-         std::unique_ptr<SubscriptionHandler> handler)
+         std::shared_ptr<SubscriptionHandler> handler)
 {
-    sub_handlers[requestName].reset(handler.release());
+    sub_handlers[requestName] = std::move(handler);
 }
 
 std::string RequestServer::HandleMessage(
@@ -198,15 +197,12 @@ std::string RequestServer::HandleRequestReplyMessage(
 }
 
 void RequestServer::HandleClose(websocketpp::connection_hdl hdl) {
-    void* conn = hdl.lock().get();
-
-    auto it = conn_map.find(conn);
+    auto it = conn_map.find(StoredHdl(hdl));
 
     if (it != conn_map.end()) {
         it->second->Close();
         conn_map.erase(it);
     }
-
 }
 
 RequestServer::~RequestServer() {
@@ -222,9 +218,15 @@ void RequestServer::Stop() {
     websocketpp::lib::error_code ec;
     requestServer_.stop_listening(ec);
     requestServer_.stop();
+    std::vector<websocketpp::connection_hdl> toClose;
+    toClose.reserve(conn_map.size());
+    for (auto& pair: conn_map) {
+        toClose.push_back(pair.first.hdl);
+    }
+    for (auto& hdl: toClose) {
+        requestServer_.close(hdl, websocketpp::close::status::internal_endpoint_error, "Stopping");
+    }
     stopped.wait();
-    requestServer_.get_io_service().stop();
-    requestServer_.get_io_service().reset();
 }
 
 void RequestServer::FatalError(int code, std::string message) {
@@ -253,7 +255,7 @@ std::string RequestServer::HandleSubscriptionMessage(
     try {
         SubscriptionHandler::RequestHandle reqHdl(
             new Request(jsonRequest,raw_server,hdl));
-        conn_map.insert({hdl.lock().get(), reqHdl});
+        conn_map.insert({hdl, reqHdl});
         handler.OnRequest(reqHdl);
     } catch (const SubscriptionHandler::InvalidRequestException& e) {
         response = ErrorMessage(e.errMsg, e.code);
