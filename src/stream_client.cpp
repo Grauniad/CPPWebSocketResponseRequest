@@ -31,14 +31,17 @@ StreamClient::StreamClient(std::string url, std::string subName, std::string sub
     // Register our handlers
     m_endpoint.set_message_handler(bind(&StreamClient::on_message,this,::_1,::_2));
     m_endpoint.set_open_handler(bind(&StreamClient::on_sub_open,this,::_1));
-}
-
-void StreamClient::on_open(websocketpp::connection_hdl hdl) {
-    m_endpoint.send(hdl, "", websocketpp::frame::opcode::text);
+    m_endpoint.set_close_handler(bind(&StreamClient::on_close,this,::_1));
+    m_endpoint.set_pong_timeout_handler(bind(&StreamClient::on_pong_timeout,this, ::_1, ::_2));
+    m_endpoint.set_fail_handler(bind(&StreamClient::on_close,this,::_1));
 }
 
 void StreamClient::on_sub_open(websocketpp::connection_hdl hdl) {
     m_endpoint.send(hdl, subName + " " + subBody, websocketpp::frame::opcode::text);
+}
+
+void StreamClient::on_close(websocketpp::connection_hdl hdl) {
+    m_endpoint.stop();
 }
 
 void StreamClient::on_message(websocketpp::connection_hdl hdl, message_ptr msg)
@@ -51,10 +54,12 @@ void StreamClient::Run() {
     startFlag.set_value(true);
     websocketpp::lib::error_code ec;
     con = m_endpoint.get_connection(url, ec);
-
     if (ec) {
         std::cout << "Failed to connect [" << url << "]"
                   << ": " << ec.message() << std::endl;
+        stopFlag.set_value(true);
+        running = false;
+        throw InvalidUrlException{};
     } else {
         m_endpoint.connect(con);
         m_endpoint.run();
@@ -64,13 +69,18 @@ void StreamClient::Run() {
 }
 
 void StreamClient::Stop() {
+    bool running = Running();
+    StopNonBlock();
+    if (running) {
+        futureStop.get();
+    }
+}
+
+void StreamClient::StopNonBlock() {
     if ( Running() && con.get() ) {
         websocketpp::lib::error_code ec;
         m_endpoint.close(con,websocketpp::close::status::going_away,"", ec);
-        futureStop.get();
-    }
-
-    if (Running() ) {
+        m_endpoint.stop();
     }
 }
 
@@ -85,5 +95,17 @@ bool StreamClient::WaitUntilRunning() {
 
 StreamClient::~StreamClient() {
     this->Stop();
+}
+
+void StreamClient::Ping(unsigned int timeout) {
+    con->set_pong_timeout(timeout);
+    con->ping("PING!");
+}
+
+void StreamClient::on_pong_timeout(
+        websocketpp::connection_hdl hdl,
+        std::string msg)
+{
+    this->StopNonBlock();
 }
 

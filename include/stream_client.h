@@ -39,6 +39,10 @@ public:
      */
     bool WaitUntilRunning();
 
+    void Ping(unsigned int timeout);
+
+    struct InvalidUrlException {};
+
 protected: 
     /**
      * Run the event loop - (start the query)
@@ -49,6 +53,7 @@ protected:
      * Stop the event loop
      */
     void Stop();
+    void StopNonBlock();
     
     /**
      * Call-back triggered when a new message is received.
@@ -62,14 +67,16 @@ private:
 
 
     /**
-     * Call-back to notify us of a successful connection
-     */
-    void on_open(websocketpp::connection_hdl hdl);
-
-    /**
      * Call-back to notify us of a successful subscription connection
      */
     void on_sub_open(websocketpp::connection_hdl hdl);
+
+    /**
+     * Call-back to notify us of a close event
+     */
+    void on_close(websocketpp::connection_hdl hdl);
+
+    void on_pong_timeout(websocketpp::connection_hdl hdl, std::string msg);
 
     /**
      * Call-back triggered by the arrival of a new message

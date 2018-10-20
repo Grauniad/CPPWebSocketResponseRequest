@@ -8,6 +8,8 @@
 #include <SimpleJSON.h>
 #include <logger.h>
 #include <OSTools.h>
+#include <ReqServer.h>
+
 
 /**************************************************************
  *                Utilities
@@ -197,6 +199,7 @@ std::string RequestServer::HandleRequestReplyMessage(
 }
 
 void RequestServer::HandleClose(websocketpp::connection_hdl hdl) {
+    std::unique_lock<std::mutex> mapLock(mapGuard);
     auto it = conn_map.find(StoredHdl(hdl));
 
     if (it != conn_map.end()) {
@@ -215,27 +218,39 @@ void RequestServer::WaitUntilRunning()
 }
 
 void RequestServer::Stop() {
+    StopNoBlock();
+    stopped.wait();
+}
+
+void RequestServer::StopNoBlock() {
     websocketpp::lib::error_code ec;
     requestServer_.stop_listening(ec);
-    requestServer_.stop();
     std::vector<websocketpp::connection_hdl> toClose;
     toClose.reserve(conn_map.size());
-    for (auto& pair: conn_map) {
-        toClose.push_back(pair.first.hdl);
+    {
+        std::unique_lock<std::mutex> mapLock(mapGuard);
+
+        for (auto& pair: conn_map) {
+            toClose.push_back(pair.first.hdl);
+        }
+        for (auto& hdl: toClose) {
+            requestServer_.close(
+                hdl,
+                websocketpp::close::status::internal_endpoint_error,
+                "Stopping",
+                ec);
+        }
+        conn_map.clear();
     }
-    for (auto& hdl: toClose) {
-        requestServer_.close(hdl, websocketpp::close::status::internal_endpoint_error, "Stopping");
-    }
-    stopped.wait();
+    requestServer_.stop();
+
 }
 
 void RequestServer::FatalError(int code, std::string message) {
     failed = true;
     failCode = code;
     failMsg = std::move(message);
-    websocketpp::lib::error_code ec;
-    requestServer_.stop_listening(ec);
-    requestServer_.stop();
+    StopNoBlock();
 }
 
 std::string RequestServer::HandleSubscriptionMessage(
@@ -314,3 +329,4 @@ void RequestServer::PostTask(const RequestServer::InteruptHandler& f) {
     
     serv.post(f);
 }
+

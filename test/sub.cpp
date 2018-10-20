@@ -6,6 +6,9 @@
 #include <PipePublisher.h>
 #include <stream_client.h>
 #include <OpenConnections.h>
+#include <util_time.h>
+
+using namespace nstimestamp;
 
 const size_t serverPort = 1250;
 const std::string serverUri = "ws://localhost:1250";
@@ -272,4 +275,69 @@ TEST_F(SubTestThirdClient, AbortedClient) {
     ASSERT_EQ(message2, got);
 
     ASSERT_FALSE(messages2->GetNextMessage(got));
+}
+
+class SubErrorTest: public ::testing::Test {
+public:
+    SubErrorTest()
+    {
+        handler = TestHandler::New();
+    }
+    void SetUp() {
+
+        server.AddHandler(TestHandler::SUB_TYPE, handler);
+        // Request server's main loop is blocking, start up on a slave thread...
+        serverThread.PostTask([&] () -> void {
+            try {
+                server.HandleRequests(serverPort);
+            } catch (RequestServer::FatalErrorException& e) {
+                std::cout << "server failed!" << std::endl;
+
+            }
+        });
+        serverThread.Start();
+
+        // wait for the server to spin up...
+        server.WaitUntilRunning();
+    }
+
+protected:
+    std::shared_ptr<TestHandler> handler;
+    WorkerThread           serverThread;
+    RequestServer          server;
+
+    std::shared_ptr<PipeSubscriber<std::string>> messages;
+};
+
+TEST_F(SubErrorTest, InvalidURL) {
+    ClientPublisher   clientPub("Not a URL", "", "");
+    ASSERT_THROW(
+        clientPub.Start(),
+        StreamClient::InvalidUrlException
+    );
+}
+
+TEST_F(SubErrorTest, EarlyServerAbort) {
+    WorkerThread clientThread;
+    ClientPublisher   clientPub(serverUri, TestHandler::SUB_TYPE, "PING");
+    auto messages = clientPub.NewClient();
+    clientThread.PostTask([&] () -> void {
+        clientPub.Start();
+    });
+    clientThread.Start();
+
+    std::string got;
+    messages->WaitForMessage(got);
+
+    server.FatalError(-1, "Nope, we're done now");
+
+    Time start;
+    clientPub.Ping(100);
+    clientThread.DoTask([=] () -> void {
+        // flush the thread...
+    });
+    Time timeout;
+
+    ASSERT_GE(timeout.DiffUSecs(start), 100 * 1000);
+    ASSERT_LE(timeout.DiffUSecs(start), 101 * 1000);
 }

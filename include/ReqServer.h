@@ -140,6 +140,7 @@ private:
      * Bail out of the event loop...
      */
     void Stop();
+    void StopNoBlock();
 
     std::string HandleRequestReplyMessage(
                     const std::string& reqName,
@@ -178,6 +179,7 @@ private:
             return (raw < rhs.raw);
         }
     };
+    std::mutex mapGuard;
     std::map<StoredHdl,SubscriptionHandler::RequestHandle> conn_map;
 
     // Error tracking
