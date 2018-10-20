@@ -67,12 +67,10 @@ void StreamClient::Stop() {
     if ( Running() && con.get() ) {
         websocketpp::lib::error_code ec;
         m_endpoint.close(con,websocketpp::close::status::going_away,"", ec);
+        futureStop.get();
     }
-    m_endpoint.get_io_service().stop();
-    m_endpoint.get_io_service().reset();
 
     if (Running() ) {
-        futureStop.get();
     }
 }
 
