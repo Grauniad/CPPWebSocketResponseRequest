@@ -61,6 +61,26 @@ private:
     PipePublisher<std::string> publisher;
 };
 
+TEST(ZERO_CLIENTS, Publish) {
+    std::shared_ptr<TestHandler> handler;
+    handler = TestHandler::New();
+    WorkerThread           serverThread;
+    RequestServer          server;
+
+    server.AddHandler(TestHandler::SUB_TYPE, handler);
+    // Request server's main loop is blocking, start up on a slave thread...
+    serverThread.PostTask([&] () -> void {
+        server.HandleRequests(serverPort);
+    });
+    serverThread.Start();
+
+    // wait for the server to spin up...
+    server.WaitUntilRunning();
+
+    ASSERT_NO_THROW(handler->Publish(""));
+
+}
+
 class SubTest: public ::testing::Test {
 public:
     SubTest()
