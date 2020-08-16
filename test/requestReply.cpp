@@ -3,6 +3,7 @@
 #include "WorkerThread.h"
 #include "ReqServer.h"
 #include "io_thread.h"
+#include "ClientUtils.h"
 
 const size_t serverPort = 1250;
 const std::string serverUri = "ws://localhost:1250";
@@ -102,6 +103,7 @@ TEST(REQ_CLIENT, SuccessfulRequest)
     ASSERT_EQ(response.content_, payload);
     ASSERT_EQ(response.state_, ReplyMessage::COMPLETE);
 }
+
 
 TEST(REQ_CLIENT, ForceShutdown)
 {
@@ -323,4 +325,139 @@ TEST(REQ_CLIENT, NoDoublePortBind)
     ASSERT_THROW(
         duplicate.HandleRequests(serverPort),
         RequestServer::FatalErrorException);
+}
+
+TEST(FILE_CLIENT, FileRequest)
+{
+    WorkerThread serverThread;
+    RequestServer server;
+    // Request server's main loop is blocking, start up on a slave thread...
+    serverThread.PostTask([&] () -> void {
+        server.AddHandler(EchoSvr::REQUEST_TYPE, EchoSvr::New());
+        server.HandleRequests(serverPort);
+    });
+    serverThread.Start();
+
+    // wait for the server to spin up...
+    server.WaitUntilRunning();
+
+    std::stringstream sport;
+    sport << serverPort;
+    std::string result = ClientUtils::FileRequestLocal(sport.str(), EchoSvr::REQUEST_TYPE, "helloWorld.msg");
+
+    ASSERT_EQ(result, "Hello World!");
+}
+
+TEST(JSON_CLIENT, JSONRequest)
+{
+    WorkerThread serverThread;
+    RequestServer server;
+    // Request server's main loop is blocking, start up on a slave thread...
+    serverThread.PostTask([&] () -> void {
+        server.AddHandler(EchoSvr::REQUEST_TYPE, EchoSvr::New());
+        server.HandleRequests(serverPort);
+    });
+    serverThread.Start();
+
+    // wait for the server to spin up...
+    server.WaitUntilRunning();
+
+    std::stringstream sport;
+    sport << serverPort;
+    std::map<std::string, std::string> values = {
+            {"msg", "Hello World!"}
+    };
+    const std::string JSONMsg = R"RAW({"msg":"Hello World!"})RAW";
+    std::string result = ClientUtils::JSONRequestLocal(sport.str(), EchoSvr::REQUEST_TYPE, values);
+
+    ASSERT_EQ(result, JSONMsg);
+}
+
+TEST(FILE_CLIENT, RejectedRequest)
+{
+    WorkerThread serverThread;
+    RequestServer server;
+    // Request server's main loop is blocking, start up on a slave thread...
+    serverThread.PostTask([&] () -> void {
+        server.AddHandler(EchoSvr::REQUEST_TYPE, RejectSvr::New());
+        server.HandleRequests(serverPort);
+    });
+    serverThread.Start();
+
+    // wait for the server to spin up...
+    server.WaitUntilRunning();
+
+    std::stringstream sport;
+    sport << serverPort;
+    std::string result = ClientUtils::FileRequestLocal(sport.str(), EchoSvr::REQUEST_TYPE, "helloWorld.msg");
+
+    std::stringstream expected;
+    expected << "[REJECTED] Server Rejected our request: " << std::endl
+             << "    " << "Server URI: ws://localhost:1250" << std::endl
+             << "    " << "Code:       " << RejectSvr::ERROR_CODE << std::endl
+             << "    " << "Error:      " << "Hello World!" << std::endl;
+
+    ASSERT_EQ(result, expected.str());
+
+}
+
+TEST(FILE_CLIENT, BadFile)
+{
+    WorkerThread serverThread;
+    RequestServer server;
+    // Request server's main loop is blocking, start up on a slave thread...
+    serverThread.PostTask([&] () -> void {
+        server.AddHandler(EchoSvr::REQUEST_TYPE, EchoSvr::New());
+        server.HandleRequests(serverPort);
+    });
+    serverThread.Start();
+
+    // wait for the server to spin up...
+    server.WaitUntilRunning();
+
+    std::stringstream sport;
+    sport << serverPort;
+    std::string result = ClientUtils::FileRequestLocal(sport.str(), EchoSvr::REQUEST_TYPE, "Not a file");
+
+    ASSERT_EQ(result, "[BAD_FILE] Not a file");
+}
+
+TEST(FILE_CLIENT, BadPort)
+{
+    WorkerThread serverThread;
+    RequestServer server;
+    // Request server's main loop is blocking, start up on a slave thread...
+    serverThread.PostTask([&] () -> void {
+        server.AddHandler(EchoSvr::REQUEST_TYPE, EchoSvr::New());
+        server.HandleRequests(serverPort);
+    });
+    serverThread.Start();
+
+    // wait for the server to spin up...
+    server.WaitUntilRunning();
+
+    std::stringstream sport;
+    sport << (serverPort + 5);
+    std::string result = ClientUtils::FileRequestLocal(sport.str(), EchoSvr::REQUEST_TYPE, "helloWorld.msg");
+
+    ASSERT_EQ(result.substr(0, 12), "[DISCONNECT]");
+}
+
+TEST(FILE_CLIENT, NonIntegerPort)
+{
+    WorkerThread serverThread;
+    RequestServer server;
+    // Request server's main loop is blocking, start up on a slave thread...
+    serverThread.PostTask([&] () -> void {
+        server.AddHandler(EchoSvr::REQUEST_TYPE, EchoSvr::New());
+        server.HandleRequests(serverPort);
+    });
+    serverThread.Start();
+
+    // wait for the server to spin up...
+    server.WaitUntilRunning();
+
+    std::string result = ClientUtils::FileRequestLocal("Not A Port", EchoSvr::REQUEST_TYPE, "helloWorld.msg");
+
+    ASSERT_EQ(result.substr(0, 13), "[INVALID_URI]");
 }

@@ -25,6 +25,7 @@ add_library(CPPWebSocketResponseRequest STATIC
     include/stream_client.h
     include/IOneShotConnectionConsumer.h
     include/OpenConnections.h
+    include/ClientUtils.h
     src/io_thread.cpp
     src/ReqFileList.cpp
     src/ReqServer.cpp
@@ -32,7 +33,8 @@ add_library(CPPWebSocketResponseRequest STATIC
     src/WebPPSingleThreadOneShotClient.cpp
     src/stream_client.cpp
     src/OpenConnections.cpp
-)
+    src/ClientUtils.cpp)
+
 target_link_libraries(CPPWebSocketResponseRequest PUBLIC
     FixedJSON::FixedJSON
     ThreadComms::ThreadComms
@@ -60,6 +62,9 @@ set_property(TARGET CPPWebSocketResponseRequest PROPERTY PUBLIC_HEADER
     ${CPPWebSocketResponseRequest_SOURCE_DIR}/include/OpenConnections.h
 )
 
+add_executable(req src/req.cpp)
+target_link_libraries(req CPPWebSocketResponseRequest)
+
 #
 # Test Configuration
 #
@@ -75,6 +80,7 @@ enable_testing()
 add_test(requestReply requestReply)
 add_test(sub sub)
 
+file(COPY ${CPPWebSocketResponseRequest_SOURCE_DIR}/test/msgs/helloWorld.msg DESTINATION ${CPPWebSocketResponseRequest_BINARY_DIR})
 #
 # NOTE: Valgrind must be configured *before* testing is imported
 #
@@ -85,7 +91,7 @@ include (CTest)
 #
 # Installation instructions
 #
-install(TARGETS CPPWebSocketResponseRequest EXPORT CPPWebSocketResponseRequestTargets
+install(TARGETS CPPWebSocketResponseRequest req EXPORT CPPWebSocketResponseRequestTargets
     ARCHIVE  DESTINATION lib
     INCLUDES DESTINATION include
     PUBLIC_HEADER DESTINATION include
