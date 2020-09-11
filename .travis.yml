@@ -31,4 +31,4 @@ script:
   - ctest -T Memcheck
   - cat Testing/Temporary/*.log
   - cd ..
-  - ./CMakeUtils/travis/doCoverage.sh
+  - GCOV=gcov=-9 ./CMakeUtils/travis/doCoverage.sh
