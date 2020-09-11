@@ -92,6 +92,7 @@ include (CTest)
 # Installation instructions
 #
 install(TARGETS CPPWebSocketResponseRequest req EXPORT CPPWebSocketResponseRequestTargets
+    RUNTIME  DESTINATION bin
     ARCHIVE  DESTINATION lib
     INCLUDES DESTINATION include
     PUBLIC_HEADER DESTINATION include
