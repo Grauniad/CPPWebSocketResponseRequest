@@ -13,6 +13,9 @@ addons:
       - valgrind
       - libssl-dev
 
+cache:
+  directories:
+     - deps
 
 before_install:
   - git clone https://github.com/Grauniad/CMakeUtils.git
@@ -31,4 +34,4 @@ script:
   - ctest -T Memcheck
   - cat Testing/Temporary/*.log
   - cd ..
-  - GCOV=gcov=-9 ./CMakeUtils/travis/doCoverage.sh
+  - GCOV=gcov-9 ./CMakeUtils/travis/doCoverage.sh
