@@ -6,6 +6,7 @@
 #include <io_thread.h>
 
 #include <fstream>
+#include <sstream>
 #include <SimpleJSON.h>
 
 namespace

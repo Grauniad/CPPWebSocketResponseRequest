@@ -1,21 +1,23 @@
 #include "ReqServer.h"
 
-
 #include <iostream>
 #include <string>
-#include <sstream>
 
 #include <SimpleJSON.h>
 #include <logger.h>
 #include <OSTools.h>
-#include <ReqServer.h>
+
+#include "WebSocketPP.h"
+
 
 
 /**************************************************************
  *                Utilities
  **************************************************************/
 
+
 namespace {
+
     NewIntField(errorNumber);
     NewStringField(errorText);
     typedef SimpleParsedJSON<errorNumber,errorText> ErrorMsg;
@@ -38,30 +40,30 @@ using websocketpp::lib::placeholders::_1;
 using websocketpp::lib::placeholders::_2;
 using websocketpp::lib::bind;
 
-typedef Server::message_ptr message_ptr;
+typedef WebServer::message_ptr message_ptr;
 
 // Define a callback to handle incoming messages
 void on_message(RequestServer* s, Server* raw_server, websocketpp::connection_hdl hdl, message_ptr msg) {
     try {
         if (msg->get_payload() == "stop-listening") {
-            raw_server->stop_listening();
-            raw_server->stop();
+            ToWeb(raw_server)->stop_listening();
+            ToWeb(raw_server)->stop();
         } else {
             SLOG_FROM(LOG_VERBOSE,">> ReqServer::on_message",
                 "Received message from: " << hdl.lock().get() << endl <<
                 "Message: " << msg->get_payload() << endl);
-            const std::string& reply = s->HandleMessage(msg->get_payload(),raw_server,hdl);
+            const std::string& reply = s->HandleMessage(msg->get_payload(),raw_server,MakeWrapper(hdl));
 
             if (reply != "") {
                 SLOG_FROM(LOG_VERBOSE,"<< ReqServer::on_message",
                     "Sending Message to:" << hdl.lock().get() << endl <<
                     "Message: " << reply << endl);
-                raw_server->send(hdl,reply,websocketpp::frame::opcode::TEXT);
+                ToWeb(raw_server)->send(hdl,reply,websocketpp::frame::opcode::TEXT);
             }
         }
     } catch (RequestReplyHandler::FatalError& fatal) {
         websocketpp::lib::error_code ec;
-        raw_server->get_con_from_hdl(hdl)->close(
+        ToWeb(raw_server)->get_con_from_hdl(hdl)->close(
                 websocketpp::close::status::internal_endpoint_error,
                 "Fatal error_",
                 ec);
@@ -74,7 +76,7 @@ void on_message(RequestServer* s, Server* raw_server, websocketpp::connection_hd
 void on_close(RequestServer*s, websocketpp::connection_hdl hdl) {
     SLOG_FROM(LOG_VERBOSE,"ReqServer::on_close",
     "Closing session to: " << hdl.lock().get() << endl);
-    s->HandleClose(hdl);
+    s->HandleClose(MakeWrapper(hdl));
 }
 
 /**************************************************************
@@ -102,7 +104,7 @@ public:
      */
     void SendMessage(const std::string& msg) {
         if (Ok()) {
-            serv->send(conn,msg,websocketpp::frame::opcode::TEXT);
+            ToWeb(serv)->send(conn,msg,websocketpp::frame::opcode::TEXT);
         }
     }
 
@@ -130,10 +132,10 @@ RequestServer::RequestServer()
    , failCode(0)
 {
     // Set logging settings
-    requestServer_.clear_access_channels(websocketpp::log::alevel::all);
-    requestServer_.set_access_channels(websocketpp::log::alevel::fail);
+    ToWeb(requestServer_).clear_access_channels(websocketpp::log::alevel::all);
+    ToWeb(requestServer_).set_access_channels(websocketpp::log::alevel::fail);
 
-    requestServer_.init_asio();
+    ToWeb(requestServer_).init_asio();
 }
 
 void RequestServer::AddHandler(
@@ -153,7 +155,7 @@ void RequestServer::AddHandler(
 std::string RequestServer::HandleMessage(
     const std::string& request,
     Server* raw_server,
-    websocketpp::connection_hdl hdl)
+    ConnectHdl hdl)
 {
 
     std::string response = "";
@@ -198,7 +200,7 @@ std::string RequestServer::HandleRequestReplyMessage(
     return response;
 }
 
-void RequestServer::HandleClose(websocketpp::connection_hdl hdl) {
+void RequestServer::HandleClose(ConnectHdl hdl) {
     std::unique_lock<std::mutex> mapLock(mapGuard);
     auto it = conn_map.find(StoredHdl(hdl));
 
@@ -224,8 +226,8 @@ void RequestServer::Stop() {
 
 void RequestServer::StopNoBlock() {
     websocketpp::lib::error_code ec;
-    requestServer_.stop_listening(ec);
-    std::vector<websocketpp::connection_hdl> toClose;
+    ToWeb(requestServer_).stop_listening(ec);
+    std::vector<ConnectHdl> toClose;
     toClose.reserve(conn_map.size());
     {
         std::unique_lock<std::mutex> mapLock(mapGuard);
@@ -234,15 +236,15 @@ void RequestServer::StopNoBlock() {
             toClose.push_back(pair.first.hdl);
         }
         for (auto& hdl: toClose) {
-            requestServer_.close(
-                hdl,
+            ToWeb(requestServer_).close(
+                ToWeb(hdl),
                 websocketpp::close::status::internal_endpoint_error,
                 "Stopping",
                 ec);
         }
         conn_map.clear();
     }
-    requestServer_.stop();
+    ToWeb(requestServer_).stop();
 
 }
 
@@ -258,7 +260,7 @@ std::string RequestServer::HandleSubscriptionMessage(
                     const std::string& request,
                     SubscriptionHandler& handler,
                     Server*  raw_server,
-                    websocketpp::connection_hdl hdl)
+                    ConnectHdl hdl)
 {
     std::string response = "";
     // "REQUEST_NAME { name: JSON_REQUEST, ...}"
@@ -269,7 +271,7 @@ std::string RequestServer::HandleSubscriptionMessage(
     }
     try {
         SubscriptionHandler::RequestHandle reqHdl(
-            new Request(jsonRequest,raw_server,hdl));
+            new Request(jsonRequest,raw_server,ToWeb(hdl)));
         conn_map.insert({hdl, reqHdl});
         handler.OnRequest(reqHdl);
     } catch (const SubscriptionHandler::InvalidRequestException& e) {
@@ -289,31 +291,31 @@ void RequestServer::HandleRequests(unsigned short port) {
     } stopOnExit{stopFlag};
 
     try {
-        requestServer_.set_message_handler(bind(&on_message,this,&requestServer_,::_1,::_2));
-        requestServer_.set_close_handler(bind(&on_close,this,::_1));
+        ToWeb(requestServer_).set_message_handler(bind(&on_message,this,&requestServer_,::_1,::_2));
+        ToWeb(requestServer_).set_close_handler(bind(&on_close,this,::_1));
 
         // Allow address re-use so that orphaned sessions from an old server
         // which are about to be killed off don't prevent us starting up.
         // NOTE: This will *not* allow two active server listeners (see
         //       NoDoublePortBind test)...
-        requestServer_.set_reuse_addr(true);
+        ToWeb(requestServer_).set_reuse_addr(true);
 
         // ... unless we're on Windows, which  can't do POSIX properly.
         // (On WSL NoDoublePortBind will fail since it incorrectly allows the bind)
         if (OS::IsWSLSystem()) {
-            requestServer_.set_reuse_addr(false);
+            ToWeb(requestServer_).set_reuse_addr(false);
         }
 
-        requestServer_.listen(port);
+        ToWeb(requestServer_).listen(port);
 
-        requestServer_.start_accept();
+        ToWeb(requestServer_).start_accept();
 
         PostTask([&] () -> void {
             this->runningFlag.set_value(true);
         });
 
         // Start the ASIO io_service run loop
-        requestServer_.run();
+        ToWeb(requestServer_).run();
     } catch (websocketpp::exception const & e) {
         FatalError(-1, e.what());
     }
@@ -325,8 +327,7 @@ void RequestServer::HandleRequests(unsigned short port) {
 }
 
 void RequestServer::PostTask(const RequestServer::InteruptHandler& f) {
-    boost::asio::io_service& serv = requestServer_.get_io_service();
+    boost::asio::io_service& serv = ToWeb(requestServer_).get_io_service();
     
     serv.post(f);
 }
-

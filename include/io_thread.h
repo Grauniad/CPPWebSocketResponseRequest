@@ -1,7 +1,6 @@
 #ifndef DEV_TOOLS_CPP_LIBS_WEBSOCKETS_IO_THREAD_H__
 #define DEV_TOOLS_CPP_LIBS_WEBSOCKETS_IO_THREAD_H__
 
-#include <boost/asio.hpp>
 #include <memory>
 #include <thread>
 #include <condition_variable>
@@ -46,7 +45,7 @@ private:
      */
     void Stop();
 
-    boost::asio::io_service io_service;
+    IOService io_service;
     std::thread io_thread;
     WebPPSingleThreadOneShotClient requestClient;
 };

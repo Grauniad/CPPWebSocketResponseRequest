@@ -3,36 +3,102 @@
 //
 
 #include "WebPPSingleThreadOneShotClient.h"
+#include "WebSocketPP.h"
+
+#include "websocketpp/client.hpp"
+#include "IOneShotConnectionConsumer.h"
+#include <websocketpp/config/asio_no_tls_client.hpp>
+#include <openssl/asn1.h>
+
+using boost::asio::ip::tcp;
+
+typedef websocketpp::config::asio_client::message_type::ptr message_ptr;
+struct OneShotWebWrap {
+
+    static void OnWebPPMessage(
+            WebPPSingleThreadOneShotClient* cli,
+            websocketpp::connection_hdl hdl,
+            message_ptr msg)
+    {
+        auto con = ToWeb(cli->client_).get_con_from_hdl(hdl);
+        auto consumer = cli->conns_.GetConsumer(con);
+        if (consumer.get()) {
+            const std::string payload = msg->get_payload();
+            consumer->onMessage(std::move(payload));
+
+            // One shot protocol - kill the connection
+            con->close(0, "bye bye");
+        }
+    }
+
+    static void OnWebPPOpen(
+            WebPPSingleThreadOneShotClient* cli,
+            websocketpp::connection_hdl hdl)
+    {
+        auto con = ToWeb(cli->client_).get_con_from_hdl(hdl);
+        auto consumer = cli->conns_.GetConsumer(con);
+        if (consumer.get()) {
+            const std::string& payload = consumer->onOpen();
+            ToWeb(cli->client_).send(hdl, payload, websocketpp::frame::opcode::text);
+        }
+    }
+
+    static void OnWebPPClose(
+            WebPPSingleThreadOneShotClient* cli,
+            websocketpp::connection_hdl hdl)
+    {
+        auto con = ToWeb(cli->client_).get_con_from_hdl(hdl);
+        auto consumer = cli->conns_.GetConsumer(con);
+        if (consumer.get()) {
+            consumer->onComplete();
+            cli->conns_.ReleaseConn(con);
+        }
+    }
+
+    static void OnWebPPFail(
+            WebPPSingleThreadOneShotClient* cli,
+            websocketpp::connection_hdl hdl)
+    {
+        auto con = ToWeb(cli->client_).get_con_from_hdl(hdl);
+        auto consumer = cli->conns_.GetConsumer(con);
+        if (consumer.get()) {
+            consumer->onTerminate();
+            cli->conns_.ReleaseConn(con);
+        }
+
+    }
+};
 
 WebPPSingleThreadOneShotClient::WebPPSingleThreadOneShotClient(
-        boost::asio::io_service& io)
+        IOService& io)
 {
-    client_.init_asio(&io);
-    client_.clear_access_channels(websocketpp::log::alevel::all);
-    client_.set_access_channels(websocketpp::log::alevel::fail);
+    auto& cli = ToWeb(client_);
+    cli.init_asio(ToWeb(&io));
+    cli.clear_access_channels(websocketpp::log::alevel::all);
+    cli.set_access_channels(websocketpp::log::alevel::fail);
 
-    client_.set_message_handler(
+    cli.set_message_handler(
             websocketpp::lib::bind(
-                    &WebPPSingleThreadOneShotClient::OnWebPPMessage,
+                    &OneShotWebWrap::OnWebPPMessage,
                     this,
                     websocketpp::lib::placeholders::_1,
                     websocketpp::lib::placeholders::_2));
 
-    client_.set_open_handler(
+    cli.set_open_handler(
             websocketpp::lib::bind(
-                    &WebPPSingleThreadOneShotClient::OnWebPPOpen,
+                    &OneShotWebWrap::OnWebPPOpen,
                     this,
                     websocketpp::lib::placeholders::_1));
 
-    client_.set_close_handler(
+    cli.set_close_handler(
             websocketpp::lib::bind(
-                    &WebPPSingleThreadOneShotClient::OnWebPPClose,
+                    &OneShotWebWrap::OnWebPPClose,
                     this,
                     websocketpp::lib::placeholders::_1));
 
-    client_.set_fail_handler(
+    cli.set_fail_handler(
             websocketpp::lib::bind(
-                    &WebPPSingleThreadOneShotClient::OnWebPPFail,
+                    &OneShotWebWrap::OnWebPPFail,
                     this,
                     websocketpp::lib::placeholders::_1));
 }
@@ -43,63 +109,15 @@ size_t WebPPSingleThreadOneShotClient::newConnection (
 {
     size_t hdl = 0;
     websocketpp::lib::error_code ec;
-    auto con = client_.get_connection(uri, ec);
+    auto con = ToWeb(client_).get_connection(uri, ec);
 
     if (ec || con.get() == nullptr) {
         consumer->onInvalidRequest(ec.message());
     } else {
         hdl = conns_.NewConn(consumer, con.get());
-        client_.connect(con);
+        ToWeb(client_).connect(con);
     }
 
     return hdl;
 }
 
-void WebPPSingleThreadOneShotClient::OnWebPPOpen(
-        websocketpp::connection_hdl hdl)
-{
-    auto con = client_.get_con_from_hdl(hdl);
-    auto consumer = conns_.GetConsumer(con);
-    if (consumer.get()) {
-        const std::string& payload = consumer->onOpen();
-        client_.send(hdl, payload, websocketpp::frame::opcode::text);
-    }
-}
-
-void WebPPSingleThreadOneShotClient::OnWebPPMessage(
-        websocketpp::connection_hdl hdl,
-        WebPPSingleThreadOneShotClient::message_ptr msg)
-{
-    auto con = client_.get_con_from_hdl(hdl);
-    auto consumer = conns_.GetConsumer(con);
-    if (consumer.get()) {
-        const std::string payload = msg->get_payload();
-        consumer->onMessage(std::move(payload));
-
-        // One shot protocol - kill the connection
-        con->close(0, "bye bye");
-    }
-}
-
-void WebPPSingleThreadOneShotClient::OnWebPPClose(
-        websocketpp::connection_hdl hdl)
-{
-    auto con = client_.get_con_from_hdl(hdl);
-    auto consumer = conns_.GetConsumer(con);
-    if (consumer.get()) {
-        consumer->onComplete();
-        conns_.ReleaseConn(con);
-    }
-}
-
-void WebPPSingleThreadOneShotClient::OnWebPPFail(
-        websocketpp::connection_hdl hdl)
-{
-    auto con = client_.get_con_from_hdl(hdl);
-    auto consumer = conns_.GetConsumer(con);
-    if (consumer.get()) {
-        consumer->onTerminate();
-        conns_.ReleaseConn(con);
-    }
-
-}

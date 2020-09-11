@@ -26,6 +26,7 @@ add_library(CPPWebSocketResponseRequest STATIC
     include/IOneShotConnectionConsumer.h
     include/OpenConnections.h
     include/ClientUtils.h
+    include/CPPWSRRWraper.h
     src/io_thread.cpp
     src/ReqFileList.cpp
     src/ReqServer.cpp
@@ -33,7 +34,9 @@ add_library(CPPWebSocketResponseRequest STATIC
     src/WebPPSingleThreadOneShotClient.cpp
     src/stream_client.cpp
     src/OpenConnections.cpp
-    src/ClientUtils.cpp)
+    src/ClientUtils.cpp
+    src/Wraper.cpp
+    src/WebSocketPP.h)
 
 target_link_libraries(CPPWebSocketResponseRequest PUBLIC
     FixedJSON::FixedJSON
@@ -50,6 +53,8 @@ target_include_directories(CPPWebSocketResponseRequest PUBLIC
     $<BUILD_INTERFACE:${CPPWebSocketResponseRequest_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
+target_compile_features(CPPWebSocketResponseRequest PRIVATE cxx_std_20)
+
 
 set_property(TARGET CPPWebSocketResponseRequest PROPERTY PUBLIC_HEADER
     ${CPPWebSocketResponseRequest_SOURCE_DIR}/include/ReqFileList.h
@@ -60,6 +65,7 @@ set_property(TARGET CPPWebSocketResponseRequest PROPERTY PUBLIC_HEADER
     ${CPPWebSocketResponseRequest_SOURCE_DIR}/include/stream_client.h
     ${CPPWebSocketResponseRequest_SOURCE_DIR}/include/IOneShotConnectionConsumer.h
     ${CPPWebSocketResponseRequest_SOURCE_DIR}/include/OpenConnections.h
+    ${CPPWebSocketResponseRequest_SOURCE_DIR}/include/CPPWSRRWraper.h
 )
 
 add_executable(req src/req.cpp)

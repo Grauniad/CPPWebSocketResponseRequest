@@ -1,5 +1,4 @@
 #include <OpenConnections.h>
-#include <OpenConnections.h>
 
 void OpenConnectionsList::Add(SubscriptionHandler::RequestHandle hdl) {
     hdls.emplace_back(hdl);
