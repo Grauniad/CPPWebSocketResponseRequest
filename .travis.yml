@@ -31,7 +31,6 @@ script:
   - ./buildFromDeps.sh
   - cd Build
   - make test
-  - ctest -T Memcheck
   - cat Testing/Temporary/*.log
   - cd ..
   - GCOV=gcov-9 ./CMakeUtils/travis/doCoverage.sh
