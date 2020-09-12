@@ -1,53 +1,61 @@
 #include "stream_client.h"
 
 #include <iostream>
-#include <stream_client.h>
+#include "WebSocketPP.h"
 
 
 using websocketpp::lib::placeholders::_1;
 using websocketpp::lib::placeholders::_2;
 using websocketpp::lib::bind;
 
-typedef websocketpp::client<websocketpp::config::asio_tls_client> client;
-typedef websocketpp::lib::shared_ptr<boost::asio::ssl::context> context_ptr;
-
 using namespace std;
+
+typedef websocketpp::config::asio_tls_client::message_type::ptr message_ptr;
+
+namespace {
+    void on_message(StreamClient* cli, websocketpp::connection_hdl hdl, message_ptr msg)
+    {
+        cli->OnMessage(msg->get_payload());
+    }
+
+    void on_sub_open(WebClient* cli, const std::string* hello, websocketpp::connection_hdl hdl)
+    {
+        cli->send(hdl, *hello, websocketpp::frame::opcode::text);
+    }
+
+    void on_pong_timeout(StreamClient* cli, websocketpp::connection_hdl hdl, std::string msg)
+    {
+        cli->StopNonBlock();
+    }
+}
 
 StreamClient::StreamClient(std::string url, std::string subName, std::string subBody)
         : running(false)
-        , con(nullptr)
         , subName(std::move(subName))
         , subBody(std::move(subBody))
         , url(std::move(url))
         , futureStart(startFlag.get_future())
         , futureStop(stopFlag.get_future())
 {
-    m_endpoint.clear_access_channels(websocketpp::log::alevel::all);
-    m_endpoint.set_error_channels(websocketpp::log::elevel::all);
+    auto& endpoint = ToWeb(m_endpoint);
+    endpoint.clear_access_channels(websocketpp::log::alevel::all);
+    endpoint.set_error_channels(websocketpp::log::elevel::all);
 
-    // Initialize ASIO
-    m_endpoint.init_asio();
+    endpoint.init_asio();
+
+    hello = this->subName + " " + this->subBody;
 
     // Register our handlers
-    m_endpoint.set_message_handler(bind(&StreamClient::on_message,this,::_1,::_2));
-    m_endpoint.set_open_handler(bind(&StreamClient::on_sub_open,this,::_1));
-    m_endpoint.set_pong_timeout_handler(bind(&StreamClient::on_pong_timeout,this, ::_1, ::_2));
-}
-
-void StreamClient::on_sub_open(websocketpp::connection_hdl hdl) {
-    m_endpoint.send(hdl, subName + " " + subBody, websocketpp::frame::opcode::text);
-}
-
-void StreamClient::on_message(websocketpp::connection_hdl hdl, message_ptr msg)
-{
-    OnMessage(msg->get_payload());
+    endpoint.set_message_handler(bind(on_message,this,::_1,::_2));
+    endpoint.set_open_handler(bind(on_sub_open, &endpoint,&hello,::_1));
+    endpoint.set_pong_timeout_handler(bind(on_pong_timeout,this, ::_1, ::_2));
 }
 
 void StreamClient::Run() {
     running = true;
     startFlag.set_value(true);
     websocketpp::lib::error_code ec;
-    con = m_endpoint.get_connection(url, ec);
+    con = MakeWrapper(ToWeb(m_endpoint).get_connection(url, ec));
     if (ec) {
         std::cout << "Failed to connect [" << url << "]"
                   << ": " << ec.message() << std::endl;
@@ -55,8 +63,8 @@ void StreamClient::Run() {
         running = false;
         throw InvalidUrlException{};
     } else {
-        m_endpoint.connect(con);
-        m_endpoint.run();
+        ToWeb(m_endpoint).connect(ToWeb(con));
+        ToWeb(m_endpoint).run();
     }
     stopFlag.set_value(true);
     running = false;
@@ -71,10 +79,11 @@ void StreamClient::Stop() {
 }
 
 void StreamClient::StopNonBlock() {
-    if ( Running() && con.get() ) {
+    auto webcon = ToWeb(con);
+    if ( Running() && webcon ) {
         websocketpp::lib::error_code ec;
-        m_endpoint.close(con,websocketpp::close::status::going_away,"", ec);
-        m_endpoint.stop();
+        ToWeb(m_endpoint).close(webcon,websocketpp::close::status::going_away,"", ec);
+        ToWeb(m_endpoint).stop();
     }
 }
 
@@ -92,14 +101,8 @@ StreamClient::~StreamClient() {
 }
 
 void StreamClient::Ping(unsigned int timeout) {
-    con->set_pong_timeout(timeout);
-    con->ping("PING!");
-}
-
-void StreamClient::on_pong_timeout(
-        websocketpp::connection_hdl hdl,
-        std::string msg)
-{
-    this->StopNonBlock();
+    auto webcon = ToWeb(con);
+    webcon->set_pong_timeout(timeout);
+    webcon->ping("PING!");
 }
 

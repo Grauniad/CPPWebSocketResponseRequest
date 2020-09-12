@@ -5,13 +5,9 @@
 #ifndef CPPWEBSOCKETRESPONSEREQUEST_WEBPPCLIENT_H
 #define CPPWEBSOCKETRESPONSEREQUEST_WEBPPCLIENT_H
 
-#include "websocketpp/client.hpp"
+#include <CPPWSRRWraper.h>
 #include "IOneShotConnectionConsumer.h"
-#include <websocketpp/config/asio_no_tls_client.hpp>
-#include <openssl/asn1.h>
-
-// TODO: Don't pollute the global space...
-using boost::asio::ip::tcp;
+#include <vector>
 
 /*
  * Adapter to the webpp client, providing a much simpler interface.
@@ -32,7 +28,7 @@ public:
      *           io service is running on: and all invocations must be
      *           on that thread.
      */
-    explicit WebPPSingleThreadOneShotClient(boost::asio::io_service& io);
+    explicit WebPPSingleThreadOneShotClient(IOService& io);
 
     /*
      * Open a new request response connection to the specified uri
@@ -44,29 +40,8 @@ public:
 private:
     // TODO: If we declare to webpp that we are using a thread safe access
     //       idium then we can prevent a bunch of locking
-    typedef websocketpp::client<websocketpp::config::asio_client> Client;
-    typedef websocketpp::config::asio_client::message_type::ptr message_ptr;
-    Client client_;
-
-    /*
-     * START: Callbacks from the WebPP client...
-     */
-
-    // Call-back to notify of us a new message received
-    void OnWebPPMessage(websocketpp::connection_hdl hdl, message_ptr msg);
-
-    // Call-back to notify us of a successful connection
-    void OnWebPPOpen(websocketpp::connection_hdl hdl);
-
-    // Call-back to notify us of a closed connection
-    void OnWebPPClose(websocketpp::connection_hdl hdl);
-
-    // Call-back to notify us of a failure in the connection
-    void OnWebPPFail(websocketpp::connection_hdl hdl);
-
-    /*
-     * END: Callbacks from the WebPP client...
-     */
+    ASIOClient client_;
+    friend struct OneShotWebWrap;
 
     // TODO: Stand alone class, make it unit testable...
     // Store the active connection by handle
@@ -104,7 +79,7 @@ private:
             return released;
         }
 
-        bool ReleaseConn(Client::connection_ptr hdl) {
+        bool ReleaseConn(ASIOClient::ConnPtr hdl) {
             bool released = false;
             for ( auto it = conns_.begin();
                   !released && it < conns_.end();
@@ -120,7 +95,7 @@ private:
         }
 
         std::shared_ptr<IOneShotConnectionConsumer>
-                GetConsumer(Client::connection_ptr hdl)
+                GetConsumer(ASIOClient::ConnPtr hdl)
         {
             std::shared_ptr<IOneShotConnectionConsumer> result(nullptr);
             for ( auto it = conns_.begin();

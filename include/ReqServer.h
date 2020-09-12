@@ -5,9 +5,8 @@
 #include <map>
 #include <memory>
 
-#include <websocketpp/config/asio_no_tls.hpp>
-#include <websocketpp/server.hpp>
 #include <IPostable.h>
+#include <CPPWSRRWraper.h>
 
 class RequestReplyHandler {
 public:
@@ -64,8 +63,6 @@ public:
     virtual void OnRequest(RequestHandle hdl) = 0;
 };
 
-typedef websocketpp::server<websocketpp::config::asio> Server;
-
 /**
  *  The request server 
  */
@@ -114,7 +111,7 @@ public:
     std::string HandleMessage(
          const std::string& request,
          Server*  raw_server,
-         websocketpp::connection_hdl hdl);
+         ConnectHdl hdl);
 
     /**
      * Blocks until the request server's is up, and the event loop is running.
@@ -125,7 +122,7 @@ public:
     /**
      * Handle an on_close even on an active connection.
      */
-    void HandleClose(websocketpp::connection_hdl hdl);
+    void HandleClose(ConnectHdl hdl);
 
     struct FatalErrorException {
         int code;
@@ -152,7 +149,7 @@ private:
                     const std::string& request,
                     SubscriptionHandler& handler,
                     Server*  raw_server,
-                    websocketpp::connection_hdl hdl);
+                    ConnectHdl hdl);
 
 
     Server requestServer_;
@@ -168,12 +165,12 @@ private:
      * Maps an active connection to
      */
     struct StoredHdl{
-        StoredHdl(websocketpp::connection_hdl hdl)
-           : raw(hdl.lock().get())
+        StoredHdl(ConnectHdl hdl)
+           : raw(hdl.hdl.lock().get())
            , hdl(hdl) {}
 
         void * raw;
-        websocketpp::connection_hdl hdl;
+        ConnectHdl hdl;
 
         bool operator<(const StoredHdl& rhs) const {
             return (raw < rhs.raw);
